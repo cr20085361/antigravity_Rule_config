@@ -63,6 +63,7 @@ timeline
     2026-05-21 (v0.9.0) : 框架重构与自动化 : 引入 pgrms.py 编译引擎 : 引入一键 deploy.ps1 脚本
     2026-05-21 (v1.0.0) : 智能技能爆发 : 引入中文共创 skill-creator-cn : 引入流程约束 github-release-archiver : 完成 README 可视化规范定义
     2026-05-22 (v1.1.0) : VS Code Copilot 全局同步 : 新增 ~/.agents/skills 镜像部署 : 新增 sync-vscode 指令同步用户级 prompts
+    2026-05-22 (v1.1.1) : 仓库缓存治理 : 新增根级 .gitignore : 移除历史误跟踪 pyc 与 pytest 缓存
 ```
 
 ---
@@ -88,6 +89,11 @@ timeline
 ---
 
 ## 📝 版本归档历史
+
+### v1.1.1 (2026-05-22) 🧹
+* **[REF]** 新增仓库根级 `.gitignore`，统一忽略 `__pycache__/`、`*.py[cod]` 与 `.pytest_cache/`。
+* **[REF]** 从 Git 索引中移除 `scripts/__pycache__/` 与 `tests/__pycache__/` 下历史误跟踪的 pyc 缓存文件。
+* **[OPS]** 保留本地缓存文件，仅修复版本库污染问题，避免后续部署和测试继续脏化工作区。
 
 ### v1.1.0 (2026-05-22) 🚀
 * **[NEW]** 新增 VS Code Copilot 全局技能同步，部署时会同时写入 `~/.agents/skills`。
