@@ -417,6 +417,135 @@ def run_touching(rule_name):
         cli_error(f"更新使用次数元数据失败: {str(e)}")
 
 
+def get_global_skill_dirs(home_dir=None):
+    """
+    返回需要同步的全局技能目录。
+    - ~/.agent/skills: 兼容现有 Antigravity/Gemini 工作流
+    - ~/.agents/skills: VS Code Copilot 自定义技能目录
+    """
+    base_home = home_dir or os.path.expanduser("~")
+    return [
+        os.path.join(base_home, ".agent", "skills"),
+        os.path.join(base_home, ".agents", "skills")
+    ]
+
+
+def deploy_global_skill_packages(dist_skills, home_dir=None):
+    """
+    将编译好的技能包同步到所有受支持的全局目录。
+    返回成功写入的目录列表。
+    """
+    if not os.path.exists(dist_skills):
+        return []
+
+    deployed_dirs = []
+    seen_dirs = set()
+
+    for target_dir in get_global_skill_dirs(home_dir):
+        normalized_dir = os.path.normpath(target_dir)
+        if normalized_dir in seen_dirs:
+            continue
+        seen_dirs.add(normalized_dir)
+
+        os.makedirs(target_dir, exist_ok=True)
+        for item in os.listdir(dist_skills):
+            src = os.path.join(dist_skills, item)
+            dst = os.path.join(target_dir, item)
+            if os.path.isdir(src):
+                if os.path.exists(dst):
+                    shutil.rmtree(dst)
+                shutil.copytree(src, dst)
+            else:
+                shutil.copy2(src, dst)
+        deployed_dirs.append(target_dir)
+
+    return deployed_dirs
+
+
+def get_vscode_user_prompts_dir(home_dir=None):
+    """
+    返回 VS Code 用户级 prompts 目录。
+    优先读取环境变量覆盖，便于测试和跨环境部署。
+    """
+    env_prompts_dir = os.environ.get("VSCODE_USER_PROMPTS_FOLDER")
+    if env_prompts_dir:
+        return os.path.abspath(os.path.expanduser(env_prompts_dir))
+
+    base_home = home_dir or os.path.expanduser("~")
+    if sys.platform.startswith("win"):
+        appdata_dir = os.environ.get("APPDATA")
+        if appdata_dir:
+            return os.path.join(appdata_dir, "Code", "User", "prompts")
+        return os.path.join(base_home, "AppData", "Roaming", "Code", "User", "prompts")
+
+    if sys.platform == "darwin":
+        return os.path.join(base_home, "Library", "Application Support", "Code", "User", "prompts")
+
+    config_home = os.environ.get("XDG_CONFIG_HOME", os.path.join(base_home, ".config"))
+    return os.path.join(config_home, "Code", "User", "prompts")
+
+
+def build_vscode_global_instruction_content(rule_file_path):
+    """
+    将 RULE.md 转换为 VS Code Copilot 可读取的 user-level .instructions.md 内容。
+    """
+    rule_meta = parse_rule_metadata(rule_file_path, "custom", "productivity", rule_file_path)
+    if not rule_meta:
+        return None
+
+    content, _ = read_file_safely(rule_file_path)
+    parts = content.split("---", 2)
+    if len(parts) < 3:
+        return None
+
+    body = parts[2].lstrip()
+    description = rule_meta.get("description", "PGRMS 全局 Copilot 约束")
+
+    return (
+        "---\n"
+        "applyTo: '**'\n"
+        f"description: {json.dumps(description, ensure_ascii=False)}\n"
+        "---\n\n"
+        f"{body}"
+    )
+
+
+def deploy_vscode_global_instructions(prompts_dir=None, rule_file_path=None):
+    """
+    同步 VS Code Copilot 用户级全局 instructions。
+    """
+    source_rule = rule_file_path or os.path.join(
+        SOURCE_DIR, "custom", "productivity", "chinese-output-constraint", "RULE.md"
+    )
+    if not os.path.exists(source_rule):
+        return None
+
+    instruction_content = build_vscode_global_instruction_content(source_rule)
+    if not instruction_content:
+        return None
+
+    target_dir = prompts_dir or get_vscode_user_prompts_dir()
+    os.makedirs(target_dir, exist_ok=True)
+
+    target_file = os.path.join(target_dir, "pgrms-global.instructions.md")
+    with open(target_file, "w", encoding="utf-8", newline="\n") as f:
+        f.write(instruction_content)
+
+    return target_file
+
+
+def run_sync_vscode():
+    """
+    将全局中文输出约束同步为 VS Code Copilot 用户级 instructions。
+    """
+    target_file = deploy_vscode_global_instructions()
+    if target_file:
+        cli_success(f"VS Code Copilot 全局指令已同步至: {target_file}")
+    else:
+        cli_warning("未找到可同步的 VS Code Copilot 全局指令源文件，已跳过。")
+    return target_file
+
+
 def run_deploy(project_path=None, target="all"):
     """
     一键全自动部署：scan → compile → 文件部署。跨平台纯 Python 实现。
@@ -458,21 +587,13 @@ def run_deploy(project_path=None, target="all"):
             shutil.copy2(gemini_src, os.path.join(gemini_dir, "GEMINI.md"))
             cli_success("全局 AI 约束文件 (GEMINI.md) 已部署。")
 
+        run_sync_vscode()
+
         # 部署 Antigravity 全局技能包
         dist_skills = os.path.join(DIST_DIR, "antigravity", "skills")
-        if os.path.exists(dist_skills):
-            global_skills_dir = os.path.join(home_dir, ".agent", "skills")
-            os.makedirs(global_skills_dir, exist_ok=True)
-            for item in os.listdir(dist_skills):
-                src = os.path.join(dist_skills, item)
-                dst = os.path.join(global_skills_dir, item)
-                if os.path.isdir(src):
-                    if os.path.exists(dst):
-                        shutil.rmtree(dst)
-                    shutil.copytree(src, dst)
-                else:
-                    shutil.copy2(src, dst)
-            cli_success("全局技能包已同步至 ~/.agent/skills/")
+        deployed_dirs = deploy_global_skill_packages(dist_skills, home_dir)
+        if deployed_dirs:
+            cli_success("全局技能包已同步至 ~/.agent/skills/ 与 ~/.agents/skills/ (VS Code Copilot)。")
     else:
         print("\n\033[94m[步骤 3/3] 跳过全局部署（已直推至项目目录）\033[0m")
 
@@ -541,6 +662,9 @@ def main():
     deploy_parser.add_argument("--target", choices=["all", "cursor", "windsurf", "cline", "antigravity"],
                                default="all", help="目标 IDE (默认: all)")
 
+    # 10. sync-vscode 命令
+    subparsers.add_parser("sync-vscode", help="同步 VS Code Copilot 用户级全局 instructions")
+
     args = parser.parse_args()
 
     if not args.command:
@@ -581,6 +705,8 @@ def main():
         run_touching(args.rule)
     elif args.command == "deploy":
         run_deploy(project_path=args.path, target=args.target)
+    elif args.command == "sync-vscode":
+        run_sync_vscode()
 
 if __name__ == "__main__":
     ensure_utf8_console()

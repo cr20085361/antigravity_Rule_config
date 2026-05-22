@@ -1,6 +1,6 @@
 # 🚀 PGRMS - Antigravity 全局规则与技能配置系统
 
-本项目旨在高效存储、同步、管理和编译可供 Antigravity（AI 助手）及其他主流 IDE 助手（Cursor、Windsurf、Cline）在本地全局调用的规则（Rules）与技能（Skills），并一键完成全局配置部署。
+本项目旨在高效存储、同步、管理和编译可供 Antigravity（AI 助手）及其他主流 IDE 助手（Cursor、Windsurf、Cline、VS Code Copilot）在本地全局调用的规则（Rules）与技能（Skills），并一键完成全局配置部署。
 
 ---
 
@@ -46,9 +46,11 @@ flowchart LR
     Scan --> Index["生成并更新 metadata.json 索引库"]
     Index --> Step2["2. 调用 pgrms.py compile"]
     Step2 --> Compile["编译生成 Cursor/Cline/Antigravity 全平台格式"]
-    Compile --> Step3["3. 部署全局配置文件"]
-    Step3 --> Copy["同步技能至全局目录 ~/.agent/skills/"]
-    Copy --> End(["部署成功，看板 dashboard.html 更新"])
+    Compile --> Step3["3. 同步全局技能包"]
+    Step3 --> Copy["同步技能至 ~/.agent/skills/ 与 ~/.agents/skills/"]
+    Copy --> Step4["4. 同步全局配置与 Copilot 指令"]
+    Step4 --> Prompt["写入 pgrms-global.instructions.md 到 VS Code 用户 prompts 目录"]
+    Prompt --> End(["部署成功，看板 dashboard.html 与 Copilot 全局约束同步更新"])
 ```
 
 ### 3. 迭代一眼清（里程碑时间线）
@@ -60,6 +62,7 @@ timeline
     2026-05-20 (v0.1.0) : 初始化 Git 规则备份 : 本地技能配置打包备份
     2026-05-21 (v0.9.0) : 框架重构与自动化 : 引入 pgrms.py 编译引擎 : 引入一键 deploy.ps1 脚本
     2026-05-21 (v1.0.0) : 智能技能爆发 : 引入中文共创 skill-creator-cn : 引入流程约束 github-release-archiver : 完成 README 可视化规范定义
+    2026-05-22 (v1.1.0) : VS Code Copilot 全局同步 : 新增 ~/.agents/skills 镜像部署 : 新增 sync-vscode 指令同步用户级 prompts
 ```
 
 ---
@@ -71,8 +74,10 @@ timeline
 1. **一键智能部署（推荐）**：
    在终端运行：`powershell -ExecutionPolicy Bypass -File .\deploy.ps1`，它将自动扫描技能、编译多平台规则、同步技能到本机全局目录并更新可视化看板。
 2. **底层部署逻辑（Workflow 机制）**：
-   * 确认系统当前用户的 `~/.agent/skills` 目录存在。
-   * 将本项目经编译输出在 `dist/antigravity/skills/` 内的技能文件夹复制并覆盖到本机的 `~/.agent/skills/` 目录。
+    * 确认系统当前用户的 `~/.agent/skills` 与 `~/.agents/skills` 目录存在。
+    * 将本项目经编译输出在 `dist/antigravity/skills/` 内的技能文件夹复制并覆盖到本机的 `~/.agent/skills/` 目录，以兼容现有 Antigravity 工作流。
+    * 同时将相同技能包复制并覆盖到本机的 `~/.agents/skills/` 目录，以便 VS Code 中的 Copilot 全局读取技能。
+    * 将 `source/custom/productivity/chinese-output-constraint/RULE.md` 自动转换为 VS Code 用户级全局指令，并写入用户 prompts 目录下的 `pgrms-global.instructions.md`，使 Copilot 在跨工作区场景下默认加载中文输出约束。
    * 将本项目下的 `.gitignore_global` 文件复制并覆盖到本机的 `~/.gitignore_global`。
    * 运行终端命令：`git config --global core.excludesfile "~/.gitignore_global"`，使忽略规则在所有的 Git 仓库中生效。
    * 确认系统当前用户的 `~/.gemini` 目录存在。
@@ -83,6 +88,11 @@ timeline
 ---
 
 ## 📝 版本归档历史
+
+### v1.1.0 (2026-05-22) 🚀
+* **[NEW]** 新增 VS Code Copilot 全局技能同步，部署时会同时写入 `~/.agents/skills`。
+* **[NEW]** 新增 `sync-vscode` 指令，可将 `chinese-output-constraint` 自动转换为用户级 `pgrms-global.instructions.md`。
+* **[REF]** 更新 Windows / macOS / Linux 部署脚本与 `/deploy-config` 工作流，使全局技能与全局中文约束同步对齐。
 
 ### v1.0.0 (2026-05-21) 🚀
 * **[NEW]** 成功引入 `skill-creator-cn`（中文引导式 Skill 创作工具）。

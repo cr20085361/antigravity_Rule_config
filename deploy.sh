@@ -36,18 +36,21 @@ fi
 
 # 3. 部署 Antigravity 全局技能 (Skills)
 echo -e "\n${YELLOW}[步骤 3/5] 正在同步部署 Antigravity 全局智能技能包...${NC}"
-GLOBAL_SKILLS_DIR="$HOME/.agent/skills"
-
-# 确认并创建技能目录
-if [ ! -d "$GLOBAL_SKILLS_DIR" ]; then
-    echo -e " -> 未检测到技能配置目录，正在为您自动创建: $GLOBAL_SKILLS_DIR"
-    mkdir -p "$GLOBAL_SKILLS_DIR"
-fi
+GLOBAL_SKILL_DIRS=(
+    "$HOME/.agent/skills"
+    "$HOME/.agents/skills"
+)
 
 # 强力拷贝覆盖编译好的技能
 if [ -d "dist/antigravity/skills" ]; then
-    cp -r dist/antigravity/skills/* "$GLOBAL_SKILLS_DIR/"
-    echo -e "${GREEN} -> 成功！已将所有已编译激活的全局技能复制覆盖至: $GLOBAL_SKILLS_DIR${NC}"
+    for GLOBAL_SKILLS_DIR in "${GLOBAL_SKILL_DIRS[@]}"; do
+        if [ ! -d "$GLOBAL_SKILLS_DIR" ]; then
+            echo -e " -> 未检测到技能配置目录，正在为您自动创建: $GLOBAL_SKILLS_DIR"
+            mkdir -p "$GLOBAL_SKILLS_DIR"
+        fi
+        cp -r dist/antigravity/skills/* "$GLOBAL_SKILLS_DIR/"
+        echo -e "${GREEN} -> 成功！已将所有已编译激活的全局技能复制覆盖至: $GLOBAL_SKILLS_DIR${NC}"
+    done
 else
     echo -e "${RED} -> 错误：未找到编译好的 Antigravity 全局技能，请确认编译是否成功。${NC}"
 fi
@@ -84,6 +87,12 @@ if [ -f "GEMINI.md" ]; then
     echo -e "${GREEN} -> 您的全局 AI 交互（包括中英文偏好、思考过程文字等约束）已成功生效！${NC}"
 else
     echo -e "${RED} -> 未找到 GEMINI.md 配置文件，跳过此步骤。${NC}"
+fi
+
+if command -v python3 &>/dev/null; then
+    python3 scripts/pgrms.py sync-vscode
+else
+    python scripts/pgrms.py sync-vscode
 fi
 
 echo -e "\n${CYAN}=========================================================================${NC}"

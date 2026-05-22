@@ -13,7 +13,10 @@ import unittest
 SCRIPTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "scripts")
 sys.path.insert(0, SCRIPTS_DIR)
 
-from pgrms import run_binding, run_touching, scan_repository
+from pgrms import (
+    run_binding, run_touching, scan_repository,
+    deploy_global_skill_packages, deploy_vscode_global_instructions
+)
 from compiler import run_compilation, get_rule_body_content
 from utils import METADATA_FILE, safe_write_json, read_file_safely
 
@@ -195,6 +198,48 @@ class TestPGRMSSystem(unittest.TestCase):
         self.assertEqual(cur_data["version"], 2, "当前文件应是最新版本")
 
         print("=== 测试 6 通过 ===")
+
+    def test_7_global_skill_deploy_syncs_agent_and_agents_dirs(self):
+        """测试全局部署同时覆盖 .agent 与 .agents 目录"""
+        print("\n=== 测试 7：全局技能双目录同步 ===")
+        dist_skills = os.path.join(self.temp_project_dir, "dist", "antigravity", "skills")
+        sample_skill_dir = os.path.join(dist_skills, "sample-skill")
+        fake_home_dir = os.path.join(self.temp_project_dir, "fake_home")
+
+        os.makedirs(sample_skill_dir, exist_ok=True)
+        with open(os.path.join(sample_skill_dir, "SKILL.md"), "w", encoding="utf-8") as f:
+            f.write("---\nname: sample-skill\n---\n")
+
+        deployed_dirs = deploy_global_skill_packages(dist_skills, fake_home_dir)
+
+        singular_skill = os.path.join(fake_home_dir, ".agent", "skills", "sample-skill", "SKILL.md")
+        plural_skill = os.path.join(fake_home_dir, ".agents", "skills", "sample-skill", "SKILL.md")
+
+        self.assertEqual(len(deployed_dirs), 2)
+        self.assertTrue(os.path.exists(singular_skill), ".agent 目录未同步技能！")
+        self.assertTrue(os.path.exists(plural_skill), ".agents 目录未同步技能！")
+        print("=== 测试 7 通过 ===")
+
+    def test_8_vscode_global_instructions_sync(self):
+        """测试 VS Code Copilot 用户级全局 instructions 同步"""
+        print("\n=== 测试 8：VS Code 全局指令同步 ===")
+        fake_prompts_dir = os.path.join(self.temp_project_dir, "fake_vscode_prompts")
+        source_rule = os.path.join(
+            self.root_dir,
+            "source", "custom", "productivity", "chinese-output-constraint", "RULE.md"
+        )
+
+        target_file = deploy_vscode_global_instructions(fake_prompts_dir, source_rule)
+
+        self.assertTrue(os.path.exists(target_file), "VS Code 全局 instructions 未生成！")
+
+        with open(target_file, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        self.assertIn("applyTo: '**'", content)
+        self.assertIn("全局中文输出约束规则", content)
+        self.assertIn("description:", content)
+        print("=== 测试 8 通过 ===")
 
 
 if __name__ == "__main__":

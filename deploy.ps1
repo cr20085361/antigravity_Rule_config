@@ -17,17 +17,20 @@ python scripts/pgrms.py compile --target all
 
 # 3. Deploy Antigravity Global Skills
 Write-Host "[Step 3/4] Deploying global Antigravity skills..."
-$globalSkillsDir = "$env:USERPROFILE\.agent\skills"
-
-# Confirm and create global skills directory if missing
-if (-not (Test-Path $globalSkillsDir)) {
-    New-Item -ItemType Directory -Force -Path $globalSkillsDir | Out-Null
-}
+$globalSkillTargets = @(
+    @{ Label = "Antigravity"; Path = "$env:USERPROFILE\.agent\skills" },
+    @{ Label = "VS Code Copilot"; Path = "$env:USERPROFILE\.agents\skills" }
+)
 
 # Copy compiled skills over
 if (Test-Path "dist\antigravity\skills") {
-    Copy-Item -Path "dist\antigravity\skills\*" -Destination $globalSkillsDir -Recurse -Force
-    Write-Host " -> SUCCESS: Skills synchronized successfully."
+    foreach ($target in $globalSkillTargets) {
+        if (-not (Test-Path $target.Path)) {
+            New-Item -ItemType Directory -Force -Path $target.Path | Out-Null
+        }
+        Copy-Item -Path "dist\antigravity\skills\*" -Destination $target.Path -Recurse -Force
+        Write-Host " -> SUCCESS: Skills synchronized to $($target.Label): $($target.Path)"
+    }
 }
 
 # 4. Deploy Global Configuration Files
@@ -51,6 +54,8 @@ if (Test-Path "GEMINI.md") {
     Copy-Item -Path "GEMINI.md" -Destination $globalGeminiFile -Force
     Write-Host " -> SUCCESS: Global AI constraint file (GEMINI.md) deployed."
 }
+
+python scripts/pgrms.py sync-vscode
 
 Write-Host "========================================="
 Write-Host "PGRMS Deployment Completed Successfully!"
